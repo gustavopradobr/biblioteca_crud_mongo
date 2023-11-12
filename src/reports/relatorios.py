@@ -184,40 +184,49 @@ class Relatorio:
         print(df_pedidos_fornecedor[["empresa", "qtd_pedidos", "valor_total"]])
         input("Pressione Enter para Sair do Relatório de Fornecedores")
 
-    def get_relatorio_produtos(self):
+    def get_relatorio_devolucoes(self) -> bool:
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
         mongo.connect()
         # Recupera os dados transformando em um DataFrame
-        query_result = mongo.db["produtos"].find({}, 
-                                                 {"codigo_produto": 1, 
-                                                  "descricao_produto": 1, 
+        query_result = mongo.db["devolucoes"].find({}, 
+                                                 {"id_devolucao": 1, 
+                                                  "id_emprestimo": 1, 
+                                                  "data_devolucao": 1, 
                                                   "_id": 0
-                                                 }).sort("descricao_produto", ASCENDING)
-        df_produto = pd.DataFrame(list(query_result))
+                                                 }).sort("id_devolucao", ASCENDING)
+        dataframe = pd.DataFrame(list(query_result))
         # Fecha a conexão com o Mongo
         mongo.close()
         # Exibe o resultado
-        print(df_produto)        
-        input("Pressione Enter para Sair do Relatório de Produtos")
-
-    def get_relatorio_clientes(self):
+        if dataframe.empty:
+            print("A tabela Devolucoes não possui registros.")
+            return False        
+        print(dataframe)
+        return True
+    
+    def get_relatorio_usuarios(self) -> bool:
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
         mongo.connect()
         # Recupera os dados transformando em um DataFrame
-        query_result = mongo.db["clientes"].find({}, 
-                                                 {"cpf": 1, 
+        query_result = mongo.db["usuarios"].find({}, 
+                                                 {"id_usuario": 1, 
                                                   "nome": 1, 
+                                                  "email": 1, 
+                                                  "telefone": 1, 
                                                   "_id": 0
-                                                 }).sort("nome", ASCENDING)
-        df_cliente = pd.DataFrame(list(query_result))
+                                                 }).sort("id_usuario", ASCENDING)
+        dataframe = pd.DataFrame(list(query_result))
         # Fecha a conexão com o mongo
         mongo.close()
         # Exibe o resultado
-        print(df_cliente)
-        input("Pressione Enter para Sair do Relatório de Clientes")
-
+        if dataframe.empty:
+            print("A tabela Usuarios não possui registros.")
+            return False        
+        print(dataframe)
+        return True
+    
     def get_relatorio_fornecedores(self):
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()

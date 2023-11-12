@@ -3,8 +3,8 @@ from conexion.mongo_queries import MongoQueries
 from conexion.oracle_queries import OracleQueries
 import json
 
-LIST_OF_COLLECTIONS = ["fornecedores", "clientes", "produtos", "pedidos", "itens_pedido"]
-logger = logging.getLogger(name="Example_CRUD_MongoDB")
+LIST_OF_COLLECTIONS = ["usuarios", "livros", "emprestimos", "devolucoes"]
+logger = logging.getLogger(name="Biblioteca_CRUD_MongoDB")
 logger.setLevel(level=logging.WARNING)
 mongo = MongoQueries()
 
@@ -40,12 +40,13 @@ def insert_many(data:json, collection:str):
 def extract_and_insert():
     oracle = OracleQueries()
     oracle.connect()
-    sql = "select * from labdatabase.{table}"
+    sql = "select * from {table}"
     for collection in LIST_OF_COLLECTIONS:
+        print("Getting collection: "+collection)
         df = oracle.sqlToDataFrame(sql.format(table=collection))
         if collection == "pedidos":
             df["data_pedido"] = df["data_pedido"].dt.strftime("%m-%d-%Y")
-        logger.warning(f"data extracted from database Oracle labdatabase.{collection}")
+        logger.warning(f"data extracted from database Oracle {collection}")
         records = json.loads(df.T.to_json()).values()
         logger.warning("data converted to json")
         insert_many(data=records, collection=collection)
