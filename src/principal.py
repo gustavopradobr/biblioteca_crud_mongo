@@ -3,15 +3,15 @@ from utils.splash_screen import SplashScreen
 from reports.relatorios import Relatorio
 from controller.controller_livro import Controller_Livro
 from controller.controller_usuario import Controller_Usuario
-from controller.controller_emprestimo import Controller_Emprestimo
-from controller.controller_devolucao import Controller_Devolucao
+# from controller.controller_emprestimo import Controller_Emprestimo
+# from controller.controller_devolucao import Controller_Devolucao
 
 tela_inicial = SplashScreen()
 relatorio = Relatorio()
 ctrl_livro = Controller_Livro()
 ctrl_usuario = Controller_Usuario()
-ctrl_emprestimo = Controller_Emprestimo()
-ctrl_devolucao = Controller_Devolucao()
+# ctrl_emprestimo = Controller_Emprestimo()
+# ctrl_devolucao = Controller_Devolucao()
 
 def reports(opcao_relatorio:int=0):
 

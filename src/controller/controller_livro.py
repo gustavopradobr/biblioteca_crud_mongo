@@ -1,151 +1,167 @@
+from bson import ObjectId
+import pandas as pd
 from model.livro import Livro
+from conexion.mongo_queries import MongoQueries
 from reports.relatorios import Relatorio
-from conexion.oracle_queries import OracleQueries
 
 class Controller_Livro:
     def __init__(self):
-        pass
+        self.mongo = MongoQueries()
         
     def inserir_livro(self) -> Livro:
-        ''' Ref.: https://cx-oracle.readthedocs.io/en/latest/user_guide/plsql_execution.html#anonymous-pl-sql-blocks'''
-        
         # Cria uma nova conexão com o banco
-        oracle = OracleQueries()
-        # Recupera o cursos para executar um bloco PL/SQL anônimo
-        cursor = oracle.connect()
-        # Cria a variável de saída com o tipo especificado
-        output_value = cursor.var(int)
-
+        self.mongo.connect()
+        
         #Solicita ao usuario os dados do livro
         print("\nInsira os dados do livro a ser cadastrado.\n")
         titulo_novo_livro = input("Título: ")
         autor_novo_livro = input("Autor: ")
         ano_novo_livro = int(input("Ano de publicação (número): "))
         qtd_novo_livro = int(input("Quantidade (número): "))
-
         while qtd_novo_livro < 1:
             print(f"\n\nQuantidade inválida. Insira um valor maior ou igual a 1: ")
             qtd_novo_livro = int(input("\nDigite a quantidade total desejada (número): "))
 
-        # Cria um dicionário para mapear as variáveis de entrada e saída
-        data = dict(codigo=output_value, titulo=titulo_novo_livro, autor=autor_novo_livro, ano=ano_novo_livro, qtd=qtd_novo_livro)
-        # Executa o bloco PL/SQL anônimo para inserção do novo livro e recuperação da chave primária criada pela sequence
-        cursor.execute("""
-        begin
-            :codigo := LIVROS_ID_LIVRO_SEQ.NEXTVAL;
-            insert into livros values(:codigo, :titulo, :autor, :ano, :qtd);
-        end;
-        """, data)
-        # Recupera o código do novo livro
-        id_livro = output_value.getvalue()
-        # Persiste (confirma) as alterações
-        oracle.conn.commit()
-        # Recupera os dados do novo livro criado transformando em um DataFrame
-        novo_livro = Controller_Livro.get_livro_from_dataframe(oracle, id_livro)
-        # Exibe os atributos do novo livro
-        print(novo_livro.to_string())
-        # Retorna o objeto livro para utilização posterior, caso necessário
-        return novo_livro
+        proximo = self.mongo.db["livros"].aggregate([
+                                                    {
+                                                        '$group': {
+                                                            '_id': '$livros', 
+                                                            'proximo_livro': {
+                                                                '$max': '$id_livro'
+                                                            }
+                                                        }
+                                                    }, {
+                                                        '$project': {
+                                                            'proximo_livro': {
+                                                                '$sum': [
+                                                                    '$proximo_livro', 1
+                                                                ]
+                                                            }, 
+                                                            '_id': 0
+                                                        }
+                                                    }
+                                                ])
+
+        proximo = int(list(proximo)[0]['proximo_livro'])
+        
+        # Insere e Recupera o código do novo registro
+        id_registro = self.mongo.db["livros"].insert_one({"id_livro": proximo, "titulo": titulo_novo_livro, "autor": autor_novo_livro, "ano_publicacao": ano_novo_livro, "quantidade": qtd_novo_livro})
+        # Recupera os dados do novo registro criado transformando em um DataFrame
+        dataframe = Controller_Livro.recupera_registro(self.mongo, id_registro.inserted_id)
+        # Cria um novo objeto
+        novo_registro = Livro(dataframe.id_livro.values[0], dataframe.titulo.values[0], dataframe.autor.values[0], dataframe.ano_publicacao.values[0], dataframe.quantidade.values[0])
+        # Exibe os atributos do novo registro
+        print(novo_registro.to_string())
+        self.mongo.close()
+        # Retorna o objeto novo_produto para utilização posterior, caso necessário
+        return novo_registro
 
     def atualizar_livro(self) -> Livro:
         # Cria uma nova conexão com o banco que permite alteração
-        oracle = OracleQueries(can_write=True)
-        oracle.connect()
+        self.mongo.connect()
 
-        # Solicita ao usuário o código do livro a ser alterado
-        id_livro = int(input("Código do Livro que irá alterar: "))        
+        # Solicita ao usuário o código da entidade a ser alterada
+        id_livro = int(input("Código do Livro que irá alterar: "))
 
-        # Verifica se o livro existe na base de dados
-        if not Controller_Livro.verifica_existencia_livro(oracle, id_livro):
+        # Verifica se o registro existe na base de dados
+        if not Controller_Livro.verifica_existencia_livro(self.mongo, id_livro):
+            self.mongo.close()
             print(f"O código {id_livro} não existe.")
             return None
-        #encerra antecipadamente cado o livro não exista
-
-        livro_atual = Controller_Livro.get_livro_from_dataframe(oracle, id_livro)
+        
+        livro_atual = Controller_Livro.get_livro_from_dataframe(self.mongo, id_livro)
 
         print("Insira os novos dados do livro a ser atualizado.\n")
         titulo = input("Título: ")
         autor = input("Autor: ")
         ano = int(input("Ano de publicação (número): "))
-        qtd = int(input("Quantidade total (número): "))
-
+        qtd = int(input("Quantidade (número): "))
         while qtd < livro_atual.get_quantidade():
             print(f"Você não pode reduzir a quantidade total de {livro_atual.get_quantidade()}. Insira um valor maior ou igual: ")
             qtd = int(input("Quantidade total (número): "))
 
-        # Atualiza a descrição do livro existente
-        oracle.write(f"update livros set titulo = '{titulo}', autor = '{autor}', ano_publicacao = '{ano}', quantidade = '{qtd}' where id_livro = {id_livro}")
+        # Atualiza a descrição do produto existente
+        self.mongo.db["livros"].update_one({"id_livro": id_livro}, {"$set": {"titulo": titulo, "autor": autor, "ano_publicacao": ano, "quantidade": qtd}})
 
-        # Cria um novo objeto Livro
-        livro_atualizado = Controller_Livro.get_livro_from_dataframe(oracle, id_livro)
-
-        # Exibe os atributos do novo livro
+        # Recupera os dados em um DataFrame
+        dataframe = Controller_Livro.recupera_livro_codigo(self.mongo, id_livro)
+        # Cria um novo objeto
+        livro_atualizado = Livro(dataframe.id_livro.values[0], dataframe.titulo.values[0], dataframe.autor.values[0], dataframe.ano_publicacao.values[0], dataframe.quantidade.values[0])
+        # Exibe os atributos do novo produto
         print(livro_atualizado.to_string())
-
-        # Retorna o objeto livro_atualizado para utilização posterior, caso necessário
+        self.mongo.close()
+        # Retorna o objeto
         return livro_atualizado
 
     def excluir_livro(self):
         # Cria uma nova conexão com o banco que permite alteração
-        oracle = OracleQueries(can_write=True)
-        oracle.connect()
+        self.mongo.connect()
 
-        # Solicita ao usuário o código da entidade a ser alterada
-        id_livro = int(input("Código do Livro que irá excluir: "))        
+        # Solicita o código da entidade a ser excluida
+        id_livro = int(input("Código do Livro que irá excluir: "))  
 
-        # Verifica se a entidade existe na base de dados
-        if not Controller_Livro.verifica_existencia_livro(oracle, id_livro):            
+        # Verifica se o produto existe na base de dados
+        if not Controller_Livro.verifica_existencia_livro(self.mongo, id_livro): 
+            self.mongo.close()
             print(f"O código {id_livro} não existe.")
-
-        # Confirma se o usuário realmente deseja excluir o item selecionado
-        confirmar_exclusao = input("Deseja realmente continuar com a exclusão? (S/N): ")
-        if confirmar_exclusao.strip().lower() != "s":
-            return None
-
-        livro_chave_estrangeira = oracle.sqlToDataFrame(f"select id_livro from emprestimos where id_livro = {id_livro}")
-
-        if not livro_chave_estrangeira.empty:
-            print(f"O livro de código {id_livro} possui registros dependentes. Deseja excluir mesmo assim? [S/N]")
-            opcao = input()
-
-            if opcao.upper() != "S":
-                print("Operação cancelada.")
-                return None
-
-            print("Excluindo registros dependentes...")
-
-        # Recupera os dados da entidade e cria um novo objeto para informar que foi removido
-        livro_excluido = Controller_Livro.get_livro_from_dataframe(oracle, id_livro)
-        # Revome da tabela
-        oracle.write(f"delete from livros where id_livro = {id_livro}")            
-        # Exibe os atributos do objeto excluído
-        print("Livro Removido com Sucesso!")
-        print(livro_excluido.to_string())
-
-    @staticmethod
-    def verifica_existencia_livro(oracle:OracleQueries, id_livro:int=None) -> bool:
-        # Recupera os dados da nova entidade criada transformando em um DataFrame
-        df_livro = oracle.sqlToDataFrame(f"select id_livro, titulo, autor, ano_publicacao, quantidade from livros where id_livro = {id_livro}")
-        return not df_livro.empty
-    
-    @staticmethod
-    def get_livro_from_dataframe(oracle:OracleQueries, id_livro:int=None) -> Livro:
-        # Recupera os dados do novo livro criado transformando em um DataFrame
-        df_livro = oracle.sqlToDataFrame(f"select id_livro, titulo, autor, ano_publicacao, quantidade from livros where id_livro = {id_livro}")
-        # Cria novo objeto a partir do DataFrame
-        return Livro(df_livro.id_livro.values[0], df_livro.titulo.values[0], df_livro.autor.values[0], df_livro.ano_publicacao.values[0], df_livro.quantidade.values[0])
-    
-    @staticmethod
-    def valida_livro(oracle:OracleQueries, id_livro:int=None) -> Livro:
-        if not Controller_Livro.verifica_existencia_livro(oracle, id_livro):
-            print(f"O livro de código {id_livro} não existe na base.")
-            return None
-        else:
-            return Controller_Livro.get_livro_from_dataframe(oracle, id_livro) 
+            return
         
+        # Recupera os dados transformando em um DataFrame
+        dataframe = Controller_Livro.recupera_livro_codigo(self.mongo, id_livro)
+        # Revome da tabela
+        self.mongo.db["livros"].delete_one({"id_livro": id_livro})
+        # Cria um novo objeto para informar que foi removido
+        livro_excluido = Livro(dataframe.id_livro.values[0], dataframe.titulo.values[0], dataframe.autor.values[0], dataframe.ano_publicacao.values[0], dataframe.quantidade.values[0])
+        # Exibe os atributos do produto excluído
+        print("Livro removido com Sucesso!")
+        print(livro_excluido.to_string())
+        self.mongo.close()
+
+    def verifica_existencia_livro(mongo:MongoQueries, codigo:int=None, external: bool = False) -> bool:
+        if external:
+            # Cria uma nova conexão com o banco que permite alteração
+            mongo.connect()
+
+        dataframe = pd.DataFrame(mongo.db["livros"].find({"id_livro":codigo}, {"id_livro": 1, "_id": 0}))
+
+        if external:
+            # Fecha a conexão com o Mongo
+            mongo.close()
+
+        return not dataframe.empty
+
     @staticmethod
-    def valida_livro_disponivel(oracle:OracleQueries, id_livro:int=None) -> Livro:
-        if not Controller_Livro.verifica_existencia_livro(oracle, id_livro):
+    def recupera_registro(mongo:MongoQueries, _id:ObjectId=None) -> pd.DataFrame:
+        # Recupera os dados do registro transformando em um DataFrame
+        dataframe = pd.DataFrame(list(mongo.db["livros"].find({"_id":_id}, {"id_livro": 1, "titulo": 1, "autor": 1, "ano_publicacao": 1, "quantidade": 1, "_id": 0})))
+        return dataframe
+
+
+    @staticmethod   
+    def recupera_livro_codigo(mongo:MongoQueries, codigo:int=None, external: bool = False) -> pd.DataFrame:
+        if external:
+            # Cria uma nova conexão com o banco que permite alteração
+            mongo.connect()
+
+        # Recupera os dados do registro transformando em um DataFrame
+        dataframe = pd.DataFrame(list(mongo.db["livros"].find({"id_livro":codigo}, {"id_livro": 1, "titulo": 1, "autor": 1, "ano_publicacao": 1, "quantidade": 1, "_id": 0})))
+
+        if external:
+            # Fecha a conexão com o Mongo
+            mongo.close()
+
+        return dataframe
+    
+    @staticmethod
+    def get_livro_from_dataframe(mongo:MongoQueries, id_livro:int=None) -> Livro:
+        dataframe = Controller_Livro.recupera_livro_codigo(mongo, id_livro)
+        # Cria novo objeto a partir do DataFrame
+        return Livro(dataframe.id_livro.values[0], dataframe.titulo.values[0], dataframe.autor.values[0], dataframe.ano_publicacao.values[0], dataframe.quantidade.values[0])
+    
+
+    @staticmethod
+    def valida_livro_disponivel(mongo:MongoQueries, id_livro:int=None) -> Livro:
+        if not Controller_Livro.verifica_existencia_livro(mongo, id_livro):
             print(f"O livro de código {id_livro} não existe na base.")
             return None
         
@@ -155,4 +171,4 @@ class Controller_Livro:
             print(f"O livro de código {id_livro} não possui quantidade disponível.")
             return None
 
-        return Controller_Livro.get_livro_from_dataframe(oracle, id_livro)
+        return Controller_Livro.get_livro_from_dataframe(mongo, id_livro)

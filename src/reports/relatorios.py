@@ -205,6 +205,29 @@ class Relatorio:
         print(dataframe)
         return True
     
+    def get_relatorio_livros(self) -> bool:
+        # Cria uma nova conexão com o banco
+        mongo = MongoQueries()
+        mongo.connect()
+        # Recupera os dados transformando em um DataFrame
+        query_result = mongo.db["livros"].find({}, 
+                                                 {"id_livro": 1, 
+                                                  "titulo": 1, 
+                                                  "autor": 1, 
+                                                  "ano_publicacao": 1, 
+                                                  "quantidade": 1, 
+                                                  "_id": 0
+                                                 }).sort("id_livro", ASCENDING)
+        dataframe = pd.DataFrame(list(query_result))
+        # Fecha a conexão com o mongo
+        mongo.close()
+        # Exibe o resultado
+        if dataframe.empty:
+            print("A tabela Livros não possui registros.")
+            return False        
+        print(dataframe)
+        return True
+    
     def get_relatorio_usuarios(self) -> bool:
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
