@@ -228,6 +228,80 @@ class Relatorio:
         print(dataframe)
         return True
     
+    def get_relatorio_livros_quantidade(self) -> bool:
+        # Cria uma nova conexão com o banco
+        mongo = MongoQueries()
+        mongo.connect()
+        # Recupera os dados transformando em um DataFrame
+        query_result = mongo.db["livros"].find( {}, 
+                            {"_id": 0,
+                            "id_livro": 1,
+                            "titulo": 1,
+                            "autor": 1,
+                            "ano_publicacao": 1,
+                            "quantidade": 1,
+                            "disponibilidade": {
+                                "$subtract": [
+                                    "$quantidade",
+                                        len(list(mongo.db["emprestimos"].find({
+                                        "id_livro": {
+                                            "$eq": "$_id"
+                                        },
+                                        "id_emprestimo": {
+                                            "$nin": mongo.db["devolucoes"].distinct("id_emprestimo")
+                                        }
+                                    })))]
+                            }
+                        }).sort("id_livro", ASCENDING)
+        
+        dataframe = pd.DataFrame(list(query_result))
+        # Fecha a conexão com o mongo
+        mongo.close()
+        # Exibe o resultado
+        if dataframe.empty:
+            print("A tabela Livros não possui registros.")
+            return False        
+        print(dataframe)
+        return True
+    
+    def get_relatorio_livros_disponiveis(self) -> bool:
+        # Cria uma nova conexão com o banco
+        mongo = MongoQueries()
+        mongo.connect()
+        # Recupera os dados transformando em um DataFrame
+        query_result = mongo.db["livros"].find({}, 
+                            {"_id": 0,
+                            "id_livro": 1,
+                            "titulo": 1,
+                            "autor": 1,
+                            "ano_publicacao": 1,
+                            "quantidade": 1,
+                            "disponibilidade": {
+                                "$subtract": [
+                                    "$quantidade",
+                                    len(list(mongo.db["emprestimos"].find({
+                                        "id_livro": {
+                                            "$eq": "$_id"
+                                        },
+                                        "id_emprestimo": {
+                                            "$nin": mongo.db["devolucoes"].distinct("id_emprestimo")
+                                        }
+                                    })))]
+                            }
+                        }).sort("id_livro", ASCENDING)
+        
+        
+        dataframe = pd.DataFrame(list(query_result))
+        dataframe = dataframe[dataframe['disponibilidade'] > 0] 
+        # Fecha a conexão com o mongo
+        mongo.close()
+        # Exibe o resultado
+        if dataframe.empty:
+            print("A tabela Livros não possui registros.")
+            return False        
+        print(dataframe)
+        return True
+    
     def get_relatorio_usuarios(self) -> bool:
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
@@ -240,6 +314,62 @@ class Relatorio:
                                                   "telefone": 1, 
                                                   "_id": 0
                                                  }).sort("id_usuario", ASCENDING)
+        dataframe = pd.DataFrame(list(query_result))
+        # Fecha a conexão com o mongo
+        mongo.close()
+        # Exibe o resultado
+        if dataframe.empty:
+            print("A tabela Usuarios não possui registros.")
+            return False        
+        print(dataframe)
+        return True
+    
+    def get_relatorio_usuarios_livros(self) -> bool:
+        # Cria uma nova conexão com o banco
+        mongo = MongoQueries()
+        mongo.connect()
+        # Recupera os dados transformando em um DataFrame      
+        count_emprestimos_nao_devolvidos = mongo.db["emprestimos"].count_documents({
+                'id_usuario': "$_id",
+                'id_emprestimo': {'$nin': mongo.db["devolucoes"].distinct('id_emprestimo')}
+            })
+        query_result = mongo.db["usuarios"].aggregate([
+                                                    {
+                                                        '$lookup': {
+                                                            'from': 'emprestimos',
+                                                            'localField': 'id_usuario',
+                                                            'foreignField': 'id_usuario',
+                                                            'as': 'emprestimos_usuario'
+                                                        }
+                                                    },
+                                                    {
+                                                        '$lookup': {
+                                                            'from': 'devolucoes',
+                                                            'localField': 'id_usuario',
+                                                            'foreignField': 'id_usuario',
+                                                            'as': 'devolucoes_usuario'
+                                                        }
+                                                    },
+                                                    {
+                                                        '$project': {
+                                                            '_id': 0,
+                                                            'id_usuario': '$id_usuario',
+                                                            'nome': '$nome',
+                                                            'email': '$email',
+                                                            'telefone': '$telefone',
+                                                            'devolucoes_pendentes': {
+                                                                "$subtract": [
+                                                                    mongo.db["emprestimos"].count_documents({
+                                                                        'id_usuario': "$id_usuario",
+                                                                        'id_emprestimo': {'$nin': mongo.db["devolucoes"].distinct('id_emprestimo')}
+                                                                    }), 0]                                                            
+                                                            },
+                                                            'emprestimos_realizados': {'$size': '$emprestimos_usuario'},
+                                                            'devolucoes_realizados': {'$size': '$devolucoes_usuario'}
+                                                        }
+                                                    }
+                                                    ])
+
         dataframe = pd.DataFrame(list(query_result))
         # Fecha a conexão com o mongo
         mongo.close()

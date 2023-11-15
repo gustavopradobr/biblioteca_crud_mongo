@@ -16,9 +16,9 @@ ctrl_usuario = Controller_Usuario()
 def reports(opcao_relatorio:int=0):
 
         if opcao_relatorio == 1:
-            relatorio.get_relatorio_livros()
+            relatorio.get_relatorio_livros_quantidade()
         if opcao_relatorio == 2:
-            relatorio.get_relatorio_usuarios()
+            relatorio.get_relatorio_usuarios_livros()
         if opcao_relatorio == 3:
             relatorio.get_relatorio_emprestimos()
         if opcao_relatorio == 4:

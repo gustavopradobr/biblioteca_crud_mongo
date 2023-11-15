@@ -44,7 +44,7 @@ def clear_console(wait_time:int=3):
    import os
    from time import sleep
    import sys
-   sleep(wait_time)
+   #sleep(wait_time)
 
    print("\n\n")
    print("==============================================================================")
@@ -53,6 +53,7 @@ def clear_console(wait_time:int=3):
    print("\n\n")
 
    #desabilita o clear temporariamente para debugar
+   return
    if 'win32' in sys.platform:
       os.system("cls")
    else:
