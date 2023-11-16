@@ -122,7 +122,7 @@ class Controller_Livro:
             # Cria uma nova conexão com o banco que permite alteração
             mongo.connect()
 
-        dataframe = pd.DataFrame(mongo.db["livros"].find({"id_livro":codigo}, {"id_livro": 1, "_id": 0}))
+        dataframe = pd.DataFrame(mongo.db["livros"].find({"id_livro":int(codigo)}, {"id_livro": 1, "_id": 0}))
 
         if external:
             # Fecha a conexão com o Mongo
@@ -144,7 +144,7 @@ class Controller_Livro:
             mongo.connect()
 
         # Recupera os dados do registro transformando em um DataFrame
-        dataframe = pd.DataFrame(list(mongo.db["livros"].find({"id_livro":codigo}, {"id_livro": 1, "titulo": 1, "autor": 1, "ano_publicacao": 1, "quantidade": 1, "_id": 0})))
+        dataframe = pd.DataFrame(list(mongo.db["livros"].find({"id_livro":int(codigo)}, {"id_livro": 1, "titulo": 1, "autor": 1, "ano_publicacao": 1, "quantidade": 1, "_id": 0})))
 
         if external:
             # Fecha a conexão com o Mongo
@@ -165,7 +165,7 @@ class Controller_Livro:
             print(f"O livro de código {id_livro} não existe na base.")
             return None
         
-        livros_disponiveis_df = oracle.sqlToDataFrame(Relatorio().query_relatorio_livros_disponiveis)
+        livros_disponiveis_df = Relatorio().get_dataframe_livros_disponiveis()
 
         if not (int(id_livro) in livros_disponiveis_df.id_livro.values.tolist()):
             print(f"O livro de código {id_livro} não possui quantidade disponível.")

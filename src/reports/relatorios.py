@@ -6,184 +6,83 @@ class Relatorio:
     def __init__(self):
         pass
 
-    def get_relatorio_pedidos_e_itens(self):
+    def get_relatorio_emprestimos(self) -> bool:
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
         mongo.connect()
         # Recupera os dados transformando em um DataFrame
-        query_result = mongo.db.pedidos.aggregate([{
-                                                    "$lookup":{"from":"itens_pedido",
-                                                               "localField":"codigo_pedido",
-                                                               "foreignField":"codigo_pedido",
-                                                               "as":"item"
-                                                              }
-                                                   },
-                                                   {
-                                                    "$unwind": { "path": "$item"}
-                                                   },
-                                                   {
-                                                    "$lookup":{"from":"clientes",
-                                                               "localField":"cpf",
-                                                               "foreignField":"cpf",
-                                                               "as":"cliente"
-                                                              }
-                                                   },
-                                                   {
-                                                    "$unwind": { "path": "$cliente" }
-                                                   },
-                                                   {
-                                                    "$lookup":{"from":"fornecedores",
-                                                               "localField":"cnpj",
-                                                               "foreignField":"cnpj",
-                                                               "as":"fornecedor"
-                                                              }
-                                                   },
-                                                   {
-                                                    "$unwind": {"path": "$fornecedor"}
-                                                   },
-                                                   {
-                                                    "$lookup":{"from":'produtos',
-                                                               "localField":"item.codigo_produto",
-                                                               "foreignField":"codigo_produto",
-                                                               "as":"produto"
-                                                              }
-                                                   },
-                                                   {
-                                                    "$unwind": {"path": "$produto"}
-                                                   },
-                                                   {
-                                                    "$project": {"codigo_pedido": 1,
-                                                                 "codigo_item_pedido": "$item.codigo_item_pedido",
-                                                                 "cliente": "$cliente.nome",
-                                                                 "data_pedido":1,
-                                                                 "fornecedor": "$fornecedor.razao_social",
-                                                                 "produto": "$produto.descricao_produto",
-                                                                 "quantidade": "$item.quantidade",
-                                                                 "valor_unitario": "$item.valor_unitario",
-                                                                 "valor_total": {'$multiply':['$item.quantidade','$item.valor_unitario']},
-                                                                 "_id": 0
-                                                                }
-                                                   }])
-        
-        df_pedidos_itens = pd.DataFrame(list(query_result))
-        # Fecha a conexão com o Mongo
-        mongo.close()
-        # Exibe o resultado
-        print(df_pedidos_itens)
-        input("Pressione Enter para Sair do Relatório de Pedidos")
-
-    def get_relatorio_pedidos_por_fornecedor(self):
-        # Cria uma nova conexão com o banco
-        mongo = MongoQueries()
-        mongo.connect()
-        # Recupera os dados transformando em um DataFrame
-        query_result = mongo.db["pedidos"].aggregate([
-                                                    {
-                                                        '$group': {
-                                                            '_id': '$cnpj', 
-                                                            'qtd_pedidos': {
-                                                                '$sum': 1
+        query_result = mongo.db["emprestimos"].aggregate([
+                                                {
+                                                    '$lookup': {
+                                                        'from': "livros",
+                                                        'localField': "id_livro",
+                                                        'foreignField': "id_livro",
+                                                        'as': "livro"
+                                                    }
+                                                },
+                                                {
+                                                    '$unwind': "$livro"
+                                                },
+                                                {
+                                                    '$lookup': {
+                                                        'from': "usuarios",
+                                                        'localField': "id_usuario",
+                                                        'foreignField': "id_usuario",
+                                                        'as': "usuario"
+                                                    }
+                                                },
+                                                {
+                                                    '$unwind': "$usuario"
+                                                },
+                                                {
+                                                    '$lookup': {
+                                                        'from': "devolucoes",
+                                                        'localField': "id_emprestimo",
+                                                        'foreignField': "id_emprestimo",
+                                                        'as': "devolucao"
+                                                    }
+                                                },
+                                                {
+                                                    '$addFields': {
+                                                        'devolucao_realizada': {
+                                                            '$cond': {
+                                                            'if': { '$gt': [{ '$size': "$devolucao" }, 0] },
+                                                            'then': "Devolvido",
+                                                            'else': "Pendente"
                                                             }
-                                                        }
-                                                    }, {
-                                                        '$project': {
-                                                            'cnpj': '$_id', 
-                                                            'qtd_pedidos': 1, 
-                                                            '_id': 0
-                                                        }
-                                                    }, {
-                                                        '$lookup': {
-                                                            'from': 'pedidos', 
-                                                            'localField': 'cnpj', 
-                                                            'foreignField': 'cnpj', 
-                                                            'as': 'pedido'
-                                                        }
-                                                    }, {
-                                                        '$unwind': {
-                                                            'path': '$pedido'
-                                                        }
-                                                    }, {
-                                                        '$project': {
-                                                            'cnpj': 1, 
-                                                            'qtd_pedidos': 1, 
-                                                            'pedido': '$pedido.codigo_pedido', 
-                                                            '_id': 0
-                                                        }
-                                                    }, {
-                                                        '$lookup': {
-                                                            'from': 'itens_pedido', 
-                                                            'localField': 'pedido', 
-                                                            'foreignField': 'codigo_pedido', 
-                                                            'as': 'item'
-                                                        }
-                                                    }, {
-                                                        '$unwind': {
-                                                            'path': '$item'
-                                                        }
-                                                    }, {
-                                                        '$project': {
-                                                            'cnpj': 1, 
-                                                            'qtd_pedidos': 1, 
-                                                            'quantidade': '$item.quantidade', 
-                                                            'valor_unitario': '$item.valor_unitario', 
-                                                            '_id': 0
-                                                        }
-                                                    }, {
-                                                        '$group': {
-                                                            '_id': {
-                                                                'cnpj': '$cnpj', 
-                                                                'qtd_pedidos': '$qtd_pedidos'
-                                                            }, 
-                                                            'valor_total': {
-                                                                '$sum': {
-                                                                    '$multiply': [
-                                                                        '$quantidade', '$valor_unitario'
-                                                                    ]
-                                                                }
-                                                            }
-                                                        }
-                                                    }, {
-                                                        '$unwind': {
-                                                            'path': '$_id'
-                                                        }
-                                                    }, {
-                                                        '$project': {
-                                                            'cnpj': '$_id.cnpj', 
-                                                            'qtd_pedidos': '$_id.qtd_pedidos', 
-                                                            'valor_total': '$valor_total', 
-                                                            '_id': 0
-                                                        }
-                                                    }, {
-                                                        '$lookup': {
-                                                            'from': 'fornecedores', 
-                                                            'localField': 'cnpj', 
-                                                            'foreignField': 'cnpj', 
-                                                            'as': 'fornecedor'
-                                                        }
-                                                    }, {
-                                                        '$unwind': {
-                                                            'path': '$fornecedor'
-                                                        }
-                                                    }, {
-                                                        '$project': {
-                                                            'empresa': '$fornecedor.nome_fantasia', 
-                                                            'qtd_pedidos': 1, 
-                                                            'valor_total': 1, 
-                                                            '_id': 0
-                                                        }
-                                                    }, {
-                                                        '$sort': {
-                                                            'empresa': 1
                                                         }
                                                     }
+                                                },
+                                                {
+                                                    '$project': {
+                                                        "id_emprestimo": 1,
+                                                        "id_livro": 1,
+                                                        "id_usuario": 1,
+                                                        "Nome Usuario": "$usuario.nome",
+                                                        "Titulo Livro": "$livro.titulo",
+                                                        "Data Emprestimo": "$data_emprestimo",
+                                                        "Devolucao Sugerida": "$data_devolucao_sugerida",
+                                                        "Status": "$devolucao_realizada",
+                                                        '_id': 0
+                                                    }
+                                                },
+                                                {
+                                                    '$sort': {
+                                                        "devolucao_realizada": 1,
+                                                        "id_emprestimo": 1
+                                                    }
+                                                }
                                                 ])
-        df_pedidos_fornecedor = pd.DataFrame(list(query_result))
+        dataframe = pd.DataFrame(list(query_result))
         # Fecha a conexão com o Mongo
         mongo.close()
         # Exibe o resultado
-        print(df_pedidos_fornecedor[["empresa", "qtd_pedidos", "valor_total"]])
-        input("Pressione Enter para Sair do Relatório de Fornecedores")
-
+        if dataframe.empty:
+            print("A tabela Emprestimos não possui registros.")
+            return False        
+        print(dataframe)
+        return True
+    
     def get_relatorio_devolucoes(self) -> bool:
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
@@ -265,6 +164,14 @@ class Relatorio:
         return True
     
     def get_relatorio_livros_disponiveis(self) -> bool:
+        dataframe = self.get_dataframe_livros_disponiveis()
+        if dataframe.empty:
+            print("A tabela Livros não possui registros.")
+            return False        
+        print(dataframe)
+        return True
+    
+    def get_dataframe_livros_disponiveis(self) -> pd.DataFrame:
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
         mongo.connect()
@@ -295,13 +202,8 @@ class Relatorio:
         dataframe = dataframe[dataframe['disponibilidade'] > 0] 
         # Fecha a conexão com o mongo
         mongo.close()
-        # Exibe o resultado
-        if dataframe.empty:
-            print("A tabela Livros não possui registros.")
-            return False        
-        print(dataframe)
-        return True
-    
+        return dataframe
+
     def get_relatorio_usuarios(self) -> bool:
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
@@ -333,6 +235,9 @@ class Relatorio:
                 'id_usuario': "$_id",
                 'id_emprestimo': {'$nin': mongo.db["devolucoes"].distinct('id_emprestimo')}
             })
+        
+
+
         query_result = mongo.db["usuarios"].aggregate([
                                                     {
                                                         '$lookup': {
@@ -343,33 +248,88 @@ class Relatorio:
                                                         }
                                                     },
                                                     {
-                                                        '$lookup': {
-                                                            'from': 'devolucoes',
-                                                            'localField': 'id_usuario',
-                                                            'foreignField': 'id_usuario',
-                                                            'as': 'devolucoes_usuario'
-                                                        }
-                                                    },
-                                                    {
                                                         '$project': {
                                                             '_id': 0,
                                                             'id_usuario': '$id_usuario',
                                                             'nome': '$nome',
                                                             'email': '$email',
                                                             'telefone': '$telefone',
+                                                            'devolucoes': {
+                                                                "$sum": [
+                                                                    0,
+
+                                                                    len(list(mongo.db["devolucoes"].find({
+                                                                        "id_emprestimo": {
+                                                                            "$eq": "$emprestimos_usuario"
+                                                                        }
+                                                                    })))
+
+                                                                    ]                                                            
+                                                            },
                                                             'devolucoes_pendentes': {
                                                                 "$subtract": [
-                                                                    mongo.db["emprestimos"].count_documents({
-                                                                        'id_usuario': "$id_usuario",
-                                                                        'id_emprestimo': {'$nin': mongo.db["devolucoes"].distinct('id_emprestimo')}
-                                                                    }), 0]                                                            
+                                                                    {'$size': '$emprestimos_usuario'},
+                                                                    mongo.db["devolucoes"].count_documents({
+                                                                        'id_emprestimo': "$emprestimos_usuario"
+                                                                    })
+                                                                    ]                                                            
                                                             },
-                                                            'emprestimos_realizados': {'$size': '$emprestimos_usuario'},
-                                                            'devolucoes_realizados': {'$size': '$devolucoes_usuario'}
+                                                            'emprestimos_realizados': {'$size': '$emprestimos_usuario'}
                                                         }
                                                     }
                                                     ])
-
+        
+        query_result = mongo.db['usuarios'].aggregate([
+                                                {
+                                                    '$lookup': {
+                                                        'from': "emprestimos",
+                                                        'localField': "id_usuario",
+                                                        'foreignField': "id_usuario",
+                                                        'as': "emprestimos"
+                                                    }
+                                                },
+                                                {
+                                                    '$lookup': {
+                                                        'from': "devolucoes",
+                                                        'localField': "id_usuario",
+                                                        'foreignField': "id_usuario",
+                                                        'as': "devolucoes"
+                                                    }
+                                                },
+                                                {
+                                                    '$addFields': {
+                                                        'emprestimos_sem_devolucao': {
+                                                            '$filter': {
+                                                            'input': "$emprestimos",
+                                                            'as': "emprestimo",
+                                                            'cond': {
+                                                                '$not': {
+                                                                    '$in': ["$$emprestimo.id_emprestimo", "$devolucoes.id_emprestimo"]
+                                                                }
+                                                            }
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    '$addFields': {
+                                                        'quantidade_emprestimos_sem_devolucao': {
+                                                            '$size': "$emprestimos_sem_devolucao"
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    '$project': {
+                                                        '_id': 0,
+                                                        'id_usuario': '$id_usuario',
+                                                        'Nome': '$nome',
+                                                        'Email': '$email',
+                                                        'Telefone': '$telefone',
+                                                        'Devolucoes Pendente': '$quantidade_emprestimos_sem_devolucao',
+                                                        'Emprestimos Realizados': {'$size': '$emprestimos'}
+                                                    }
+                                                }
+                                                ])
         dataframe = pd.DataFrame(list(query_result))
         # Fecha a conexão com o mongo
         mongo.close()
@@ -379,166 +339,3 @@ class Relatorio:
             return False        
         print(dataframe)
         return True
-    
-    def get_relatorio_fornecedores(self):
-        # Cria uma nova conexão com o banco
-        mongo = MongoQueries()
-        mongo.connect()
-        # Recupera os dados transformando em um DataFrame
-        query_result = mongo.db["fornecedores"].find({}, 
-                                                     {"cnpj": 1, 
-                                                      "razao_social": 1, 
-                                                      "nome_fantasia": 1, 
-                                                      "_id": 0
-                                                     }).sort("nome_fantasia", ASCENDING)
-        df_fornecedor = pd.DataFrame(list(query_result))
-        # Fecha a conexão com o mongo
-        mongo.close()
-        # Exibe o resultado
-        print(df_fornecedor)        
-        input("Pressione Enter para Sair do Relatório de Fornecedores")
-
-    def get_relatorio_pedidos(self):
-        # Cria uma nova conexão com o banco
-        mongo = MongoQueries()
-        mongo.connect()
-        # Recupera os dados transformando em um DataFrame
-        query_result = mongo.db["pedidos"].aggregate([
-                                                    {
-                                                        '$lookup': {
-                                                            'from': 'fornecedores', 
-                                                            'localField': 'cnpj', 
-                                                            'foreignField': 'cnpj', 
-                                                            'as': 'fornecedor'
-                                                        }
-                                                    }, {
-                                                        '$unwind': {
-                                                            'path': '$fornecedor'
-                                                        }
-                                                    }, {
-                                                        '$project': {
-                                                            'codigo_pedido': 1, 
-                                                            'data_pedido': 1, 
-                                                            'empresa': '$fornecedor.nome_fantasia', 
-                                                            'cpf': 1, 
-                                                            '_id': 0
-                                                        }
-                                                    }, {
-                                                        '$lookup': {
-                                                            'from': 'clientes', 
-                                                            'localField': 'cpf', 
-                                                            'foreignField': 'cpf', 
-                                                            'as': 'cliente'
-                                                        }
-                                                    }, {
-                                                        '$unwind': {
-                                                            'path': '$cliente'
-                                                        }
-                                                    }, {
-                                                        '$project': {
-                                                            'codigo_pedido': 1, 
-                                                            'data_pedido': 1, 
-                                                            'empresa': 1, 
-                                                            'cliente': '$cliente.nome', 
-                                                            '_id': 0
-                                                        }
-                                                    }, {
-                                                        '$lookup': {
-                                                            'from': 'itens_pedido', 
-                                                            'localField': 'codigo_pedido', 
-                                                            'foreignField': 'codigo_pedido', 
-                                                            'as': 'item'
-                                                        }
-                                                    }, {
-                                                        '$unwind': {
-                                                            'path': '$item', 'preserveNullAndEmptyArrays': True
-                                                        }
-                                                    }, {
-                                                        '$project': {
-                                                            'codigo_pedido': 1, 
-                                                            'data_pedido': 1, 
-                                                            'empresa': 1, 
-                                                            'cliente': 1, 
-                                                            'item_pedido': '$item.codigo_item_pedido', 
-                                                            'quantidade': '$item.quantidade', 
-                                                            'valor_unitario': '$item.valor_unitario', 
-                                                            'valor_total': {
-                                                                '$multiply': [
-                                                                    '$item.quantidade', '$item.valor_unitario'
-                                                                ]
-                                                            }, 
-                                                            'codigo_produto': '$item.codigo_produto', 
-                                                            '_id': 0
-                                                        }
-                                                    }, {
-                                                        '$lookup': {
-                                                            'from': 'produtos', 
-                                                            'localField': 'codigo_produto', 
-                                                            'foreignField': 'codigo_produto', 
-                                                            'as': 'produto'
-                                                        }
-                                                    }, {
-                                                        '$unwind': {
-                                                            'path': '$produto', 'preserveNullAndEmptyArrays': True
-                                                        }
-                                                    }, {
-                                                        '$project': {
-                                                            'codigo_pedido': 1, 
-                                                            'data_pedido': 1, 
-                                                            'empresa': 1, 
-                                                            'cliente': 1, 
-                                                            'item_pedido': 1, 
-                                                            'quantidade': 1, 
-                                                            'valor_unitario': 1, 
-                                                            'valor_total': 1, 
-                                                            'produto': '$produto.descricao_produto', 
-                                                            '_id': 0
-                                                        }
-                                                    }, {
-                                                        '$sort': {
-                                                            'cliente': 1,
-                                                            'item_pedido': 1
-                                                        }
-                                                    }
-                                                ])
-        df_pedido = pd.DataFrame(list(query_result))
-        # Fecha a conexão com o Mongo
-        mongo.close()
-        print(df_pedido[["codigo_pedido", "data_pedido", "cliente", "empresa", "item_pedido", "produto", "quantidade", "valor_unitario", "valor_total"]])
-        input("Pressione Enter para Sair do Relatório de Pedidos")
-    
-    def get_relatorio_itens_pedidos(self):
-        # Cria uma nova conexão com o banco
-        mongo = MongoQueries()
-        mongo.connect()
-        # Realiza uma consulta no mongo e retorna o cursor resultante para a variável
-        query_result = mongo.db['itens_pedido'].aggregate([{
-                                                            '$lookup':{'from':'produtos',
-                                                                       'localField':'codigo_produto',
-                                                                       'foreignField':'codigo_produto',
-                                                                       'as':'produto'
-                                                                      }
-                                                           },
-                                                           {
-                                                            '$unwind':{"path": "$produto"}
-                                                           },
-                                                           {'$project':{'codigo_pedido':1, 
-                                                                        'codigo_item_pedido':1,
-                                                                    'codigo_produto':'$produto.codigo_produto',
-                                                                    'descricao_produto':'$produto.descricao_produto',
-                                                                    'quantidade':1,
-                                                                    'valor_unitario':1,
-                                                                    'valor_total':{'$multiply':['$quantidade','$valor_unitario']},
-                                                                    '_id':0
-                                                                    }}
-                                                          ])
-        # Converte o cursos em lista e em DataFrame
-        df_itens_pedido = pd.DataFrame(list(query_result))
-        # Troca o tipo das colunas
-        df_itens_pedido.codigo_item_pedido = df_itens_pedido.codigo_item_pedido.astype(int)
-        df_itens_pedido.codigo_pedido = df_itens_pedido.codigo_pedido.astype(int)
-        # Fecha a conexão com o mongo
-        mongo.close()
-        # Exibe o resultado
-        print(df_itens_pedido[["codigo_pedido", "codigo_item_pedido", "codigo_produto", "descricao_produto", "quantidade", "valor_unitario", "valor_total"]])
-        input("Pressione Enter para Sair do Relatório de Itens de Pedidos")

@@ -42,7 +42,7 @@ class Controller_Usuario:
         # Insere e Recupera o código do novo registro
         id_registro = self.mongo.db["usuarios"].insert_one({"id_usuario": proximo, "nome": nome, "email": email, "telefone": telefone})
         # Recupera os dados do novo registro criado transformando em um DataFrame
-        dataframe = self.recupera_registro(id_registro.inserted_id)
+        dataframe = Controller_Usuario.recupera_registro(self.mongo, id_registro.inserted_id)
         # Cria um novo objeto
         novo_registro = Usuario(dataframe.id_usuario.values[0], dataframe.nome.values[0], dataframe.email.values[0], dataframe.telefone.values[0])
         # Exibe os atributos do novo registro
@@ -59,7 +59,7 @@ class Controller_Usuario:
         id_usuario = int(input("Código do Usuário que irá alterar: "))
 
         # Verifica se o registro existe na base de dados
-        if not self.verifica_existencia_usuario(id_usuario):
+        if not Controller_Usuario.verifica_existencia_usuario(self.mongo, id_usuario):
             self.mongo.close()
             print(f"O código {id_usuario} não existe.")
             return None
@@ -72,7 +72,7 @@ class Controller_Usuario:
         # Atualiza a descrição do produto existente
         self.mongo.db["usuarios"].update_one({"id_usuario": id_usuario}, {"$set": {"nome": nome, "email": email, "telefone": telefone}})
         # Recupera os dados em um DataFrame
-        dataframe = self.recupera_usuario_codigo(id_usuario)
+        dataframe = Controller_Usuario.recupera_usuario_codigo(self.mongo, id_usuario)
         # Cria um novo objeto
         usuario_atualizado = Usuario(dataframe.id_usuario.values[0], dataframe.nome.values[0], dataframe.email.values[0], dataframe.telefone.values[0])
         # Exibe os atributos do novo produto
@@ -89,13 +89,13 @@ class Controller_Usuario:
         id_usuario = int(input("Código do Usuário que irá excluir: "))  
 
         # Verifica se o produto existe na base de dados
-        if not self.verifica_existencia_usuario(id_usuario): 
+        if not Controller_Usuario.verifica_existencia_usuario(self.mongo, id_usuario): 
             self.mongo.close()
             print(f"O código {id_usuario} não existe.")
             return
         
         # Recupera os dados transformando em um DataFrame
-        dataframe = self.recupera_usuario_codigo(id_usuario)
+        dataframe = Controller_Usuario.recupera_usuario_codigo(self.mongo, id_usuario)
         # Revome da tabela
         self.mongo.db["usuarios"].delete_one({"id_usuario": id_usuario})
         # Cria um novo objeto para informar que foi removido
@@ -105,34 +105,50 @@ class Controller_Usuario:
         print(usuario_excluido.to_string())
         self.mongo.close()
 
-    def verifica_existencia_usuario(self, codigo:int=None, external: bool = False) -> bool:
+    @staticmethod
+    def verifica_existencia_usuario(mongo:MongoQueries, codigo:int=None, external: bool = False) -> bool:
         if external:
             # Cria uma nova conexão com o banco que permite alteração
-            self.mongo.connect()
+            mongo.connect()
 
-        dataframe = pd.DataFrame(self.mongo.db["usuarios"].find({"id_usuario":codigo}, {"id_usuario": 1, "_id": 0}))
+        dataframe = pd.DataFrame(mongo.db["usuarios"].find({"id_usuario":int(codigo)}, {"id_usuario": 1, "_id": 0}))
 
         if external:
             # Fecha a conexão com o Mongo
-            self.mongo.close()
+            mongo.close()
 
         return not dataframe.empty
-
-    def recupera_registro(self, _id:ObjectId=None) -> pd.DataFrame:
+    
+    @staticmethod
+    def recupera_registro(mongo:MongoQueries, _id:ObjectId=None) -> pd.DataFrame:
         # Recupera os dados do registro transformando em um DataFrame
-        dataframe = pd.DataFrame(list(self.mongo.db["usuarios"].find({"_id":_id}, {"id_usuario": 1, "nome": 1, "email": 1, "telefone": 1, "_id": 0})))
+        dataframe = pd.DataFrame(list(mongo.db["usuarios"].find({"_id":_id}, {"id_usuario": 1, "nome": 1, "email": 1, "telefone": 1, "_id": 0})))
         return dataframe
 
-    def recupera_usuario_codigo(self, codigo:int=None, external: bool = False) -> pd.DataFrame:
+    @staticmethod
+    def get_usuario_from_dataframe(mongo:MongoQueries, codigo_usuario:int=None) -> pd.DataFrame:
+        dataframe = Controller_Usuario.recupera_usuario_codigo(mongo, codigo_usuario)
+        return Usuario(dataframe.id_usuario.values[0], dataframe.nome.values[0], dataframe.email.values[0], dataframe.telefone.values[0])
+
+    @staticmethod
+    def recupera_usuario_codigo(mongo:MongoQueries, codigo:int=None, external: bool = False) -> pd.DataFrame:
         if external:
             # Cria uma nova conexão com o banco que permite alteração
-            self.mongo.connect()
+            mongo.connect()
 
         # Recupera os dados do registro transformando em um DataFrame
-        dataframe = pd.DataFrame(list(self.mongo.db["usuarios"].find({"id_usuario":codigo}, {"id_usuario": 1, "nome": 1, "email": 1, "telefone": 1, "_id": 0})))
+        dataframe = pd.DataFrame(list(mongo.db["usuarios"].find({"id_usuario":int(codigo)}, {"id_usuario": 1, "nome": 1, "email": 1, "telefone": 1, "_id": 0})))
 
         if external:
             # Fecha a conexão com o Mongo
-            self.mongo.close()
+            mongo.close()
 
         return dataframe
+    
+    @staticmethod
+    def valida_usuario(mongo:MongoQueries, codigo_usuario:int=None) -> Usuario:
+        if not Controller_Usuario.verifica_existencia_usuario(mongo, codigo_usuario):
+            print(f"O usuário de código {codigo_usuario} não existe na base.")
+            return None
+        else:
+            return Controller_Usuario.get_usuario_from_dataframe(mongo, codigo_usuario)
