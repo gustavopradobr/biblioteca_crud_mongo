@@ -76,8 +76,13 @@ class Controller_Emprestimo:
         if(emprestimo_atualizado == None):
             return None
 
+        id_livro = int(emprestimo_atualizado.get_livro().get_id_livro())
+        id_usuario = int(emprestimo_atualizado.get_usuario().get_id_usuario())
+        data_emprestimo = emprestimo_atualizado.get_data_emprestimo()
+        data_devolucao_sugerida = emprestimo_atualizado.get_data_devolucao()
+
         # Atualiza a descrição do produto existente
-        self.mongo.db["emprestimos"].update_one({"id_emprestimo": id_emprestimo}, {"$set": {"id_livro": emprestimo_atualizado.get_livro().get_id_livro(), "id_usuario": emprestimo_atualizado.get_usuario().get_id_usuario(), "data_emprestimo": emprestimo_atualizado.get_data_emprestimo(), "data_devolucao_sugerida": emprestimo_atualizado.get_data_devolucao()}})
+        self.mongo.db["emprestimos"].update_one({"id_emprestimo": id_emprestimo}, {"$set": {"id_livro": id_livro, "id_usuario": id_usuario, "data_emprestimo": data_emprestimo, "data_devolucao_sugerida": data_devolucao_sugerida}})
 
         # Cria um novo objeto
         registro_atualizado = Controller_Emprestimo.get_emprestimo_from_dataframe(self.mongo, id_emprestimo)

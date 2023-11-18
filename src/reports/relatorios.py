@@ -6,7 +6,7 @@ class Relatorio:
     def __init__(self):
         pass
 
-    def get_relatorio_emprestimos(self) -> bool:
+    def get_query_emprestimos_detail(self):
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
         mongo.connect()
@@ -73,6 +73,15 @@ class Relatorio:
                                                     }
                                                 }
                                                 ])
+        
+        return query_result
+
+    def get_relatorio_emprestimos(self) -> bool:
+        # Cria uma nova conexão com o banco
+        mongo = MongoQueries()
+        mongo.connect()
+        # Recupera os dados transformando em um DataFrame
+        query_result = self.get_query_emprestimos_detail()
         dataframe = pd.DataFrame(list(query_result))
         # Fecha a conexão com o Mongo
         mongo.close()
@@ -91,7 +100,7 @@ class Relatorio:
         query_result = mongo.db["devolucoes"].find({}, 
                                                  {"id_devolucao": 1, 
                                                   "id_emprestimo": 1, 
-                                                  "data_devolucao": 1, 
+                                                  "Data Devolucao": "$data_devolucao", 
                                                   "_id": 0
                                                  }).sort("id_devolucao", ASCENDING)
         dataframe = pd.DataFrame(list(query_result))
@@ -127,83 +136,104 @@ class Relatorio:
         print(dataframe)
         return True
     
-    def get_relatorio_livros_quantidade(self) -> bool:
-        # Cria uma nova conexão com o banco
-        mongo = MongoQueries()
-        mongo.connect()
-        # Recupera os dados transformando em um DataFrame
-        query_result = mongo.db["livros"].find( {}, 
-                            {"_id": 0,
-                            "id_livro": 1,
-                            "titulo": 1,
-                            "autor": 1,
-                            "ano_publicacao": 1,
-                            "quantidade": 1,
-                            "disponibilidade": {
-                                "$subtract": [
-                                    "$quantidade",
-                                        len(list(mongo.db["emprestimos"].find({
-                                        "id_livro": {
-                                            "$eq": "$_id"
-                                        },
-                                        "id_emprestimo": {
-                                            "$nin": mongo.db["devolucoes"].distinct("id_emprestimo")
-                                        }
-                                    })))]
-                            }
-                        }).sort("id_livro", ASCENDING)
-        
-        dataframe = pd.DataFrame(list(query_result))
-        # Fecha a conexão com o mongo
-        mongo.close()
-        # Exibe o resultado
+    def get_relatorio_livros(self) -> bool:
+        dataframe = self.get_dataframe_livros_detail()
         if dataframe.empty:
             print("A tabela Livros não possui registros.")
-            return False        
+            return False     
         print(dataframe)
         return True
     
     def get_relatorio_livros_disponiveis(self) -> bool:
-        dataframe = self.get_dataframe_livros_disponiveis()
+        dataframe = self.get_dataframe_livros_detail()
         if dataframe.empty:
             print("A tabela Livros não possui registros.")
-            return False        
+            return False     
+        dataframe = dataframe[dataframe['Disponibilidade'] > 0]    
         print(dataframe)
         return True
     
-    def get_dataframe_livros_disponiveis(self) -> pd.DataFrame:
+    def get_dataframe_livros_detail_disponiveis(self) -> pd.DataFrame:
+        dataframe = self.get_dataframe_livros_detail()
+        if not dataframe.empty:
+            dataframe = dataframe[dataframe['Disponibilidade'] > 0]
+        return dataframe
+
+    def get_dataframe_livros_detail(self) -> pd.DataFrame:
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
         mongo.connect()
         # Recupera os dados transformando em um DataFrame
-        query_result = mongo.db["livros"].find({}, 
-                            {"_id": 0,
-                            "id_livro": 1,
-                            "titulo": 1,
-                            "autor": 1,
-                            "ano_publicacao": 1,
-                            "quantidade": 1,
-                            "disponibilidade": {
-                                "$subtract": [
-                                    "$quantidade",
-                                    len(list(mongo.db["emprestimos"].find({
-                                        "id_livro": {
-                                            "$eq": "$_id"
-                                        },
-                                        "id_emprestimo": {
-                                            "$nin": mongo.db["devolucoes"].distinct("id_emprestimo")
-                                        }
-                                    })))]
-                            }
-                        }).sort("id_livro", ASCENDING)
-        
+        query_result = mongo.db['livros'].aggregate([
+                                                {
+                                                    '$lookup': {
+                                                        'from': "emprestimos",
+                                                        'localField': "id_livro",
+                                                        'foreignField': "id_livro",
+                                                        'as': "emprestimos"
+                                                    }
+                                                },
+                                                {
+                                                    '$lookup': {
+                                                        'from': "devolucoes",
+                                                        'localField': "emprestimos.id_emprestimo",
+                                                        'foreignField': "id_emprestimo",
+                                                        'as': "devolucoes"
+                                                    }
+                                                },
+                                                {
+                                                    '$addFields': {
+                                                        'emprestimos_sem_devolucao': {
+                                                            '$filter': {
+                                                            'input': "$emprestimos",
+                                                            'as': "emprestimo",
+                                                            'cond': {
+                                                                '$not': {
+                                                                    '$in': ["$$emprestimo.id_emprestimo", "$devolucoes.id_emprestimo"]
+                                                                }
+                                                            }
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    '$addFields': {
+                                                        'devolucoes_pendentes': {
+                                                            '$size': "$emprestimos_sem_devolucao"
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    '$addFields': {
+                                                        'disponibilidade': {
+                                                            '$subtract': [
+                                                                '$quantidade',
+                                                                '$devolucoes_pendentes'
+                                                            ]
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    '$project': {
+                                                        '_id': 0,
+                                                        "id_livro": 1,
+                                                        "Titulo": "$titulo",
+                                                        "Autor": "$autor",
+                                                        "Ano Publicacao": "$ano_publicacao",
+                                                        "Quantidade": "$quantidade",
+                                                        "Disponibilidade": "$disponibilidade",
+                                                        #'Emprestimos Realizados': {'$size': '$emprestimos'},
+                                                        #'Devolucoes Pendentes': '$devolucoes_pendentes'
+                                                    }
+                                                }
+                                                ])        
         
         dataframe = pd.DataFrame(list(query_result))
-        dataframe = dataframe[dataframe['disponibilidade'] > 0] 
         # Fecha a conexão com o mongo
         mongo.close()
         return dataframe
 
+    #Não utilizado -------------------------
     def get_relatorio_usuarios(self) -> bool:
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
@@ -230,54 +260,6 @@ class Relatorio:
         # Cria uma nova conexão com o banco
         mongo = MongoQueries()
         mongo.connect()
-        # Recupera os dados transformando em um DataFrame      
-        count_emprestimos_nao_devolvidos = mongo.db["emprestimos"].count_documents({
-                'id_usuario': "$_id",
-                'id_emprestimo': {'$nin': mongo.db["devolucoes"].distinct('id_emprestimo')}
-            })
-        
-
-
-        query_result = mongo.db["usuarios"].aggregate([
-                                                    {
-                                                        '$lookup': {
-                                                            'from': 'emprestimos',
-                                                            'localField': 'id_usuario',
-                                                            'foreignField': 'id_usuario',
-                                                            'as': 'emprestimos_usuario'
-                                                        }
-                                                    },
-                                                    {
-                                                        '$project': {
-                                                            '_id': 0,
-                                                            'id_usuario': '$id_usuario',
-                                                            'nome': '$nome',
-                                                            'email': '$email',
-                                                            'telefone': '$telefone',
-                                                            'devolucoes': {
-                                                                "$sum": [
-                                                                    0,
-
-                                                                    len(list(mongo.db["devolucoes"].find({
-                                                                        "id_emprestimo": {
-                                                                            "$eq": "$emprestimos_usuario"
-                                                                        }
-                                                                    })))
-
-                                                                    ]                                                            
-                                                            },
-                                                            'devolucoes_pendentes': {
-                                                                "$subtract": [
-                                                                    {'$size': '$emprestimos_usuario'},
-                                                                    mongo.db["devolucoes"].count_documents({
-                                                                        'id_emprestimo': "$emprestimos_usuario"
-                                                                    })
-                                                                    ]                                                            
-                                                            },
-                                                            'emprestimos_realizados': {'$size': '$emprestimos_usuario'}
-                                                        }
-                                                    }
-                                                    ])
         
         query_result = mongo.db['usuarios'].aggregate([
                                                 {
@@ -291,8 +273,8 @@ class Relatorio:
                                                 {
                                                     '$lookup': {
                                                         'from': "devolucoes",
-                                                        'localField': "id_usuario",
-                                                        'foreignField': "id_usuario",
+                                                        'localField': "emprestimos.id_emprestimo",
+                                                        'foreignField': "id_emprestimo",
                                                         'as': "devolucoes"
                                                     }
                                                 },
@@ -313,7 +295,7 @@ class Relatorio:
                                                 },
                                                 {
                                                     '$addFields': {
-                                                        'quantidade_emprestimos_sem_devolucao': {
+                                                        'devolucoes_pendentes': {
                                                             '$size': "$emprestimos_sem_devolucao"
                                                         }
                                                     }
@@ -325,8 +307,8 @@ class Relatorio:
                                                         'Nome': '$nome',
                                                         'Email': '$email',
                                                         'Telefone': '$telefone',
-                                                        'Devolucoes Pendente': '$quantidade_emprestimos_sem_devolucao',
-                                                        'Emprestimos Realizados': {'$size': '$emprestimos'}
+                                                        'Emprestimos Realizados': {'$size': '$emprestimos'},
+                                                        'Devolucoes Pendentes': '$devolucoes_pendentes'
                                                     }
                                                 }
                                                 ])

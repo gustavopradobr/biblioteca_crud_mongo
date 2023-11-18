@@ -16,7 +16,7 @@ ctrl_emprestimo = Controller_Emprestimo()
 def reports(opcao_relatorio:int=0):
 
         if opcao_relatorio == 1:
-            relatorio.get_relatorio_livros_quantidade()
+            relatorio.get_relatorio_livros()
         if opcao_relatorio == 2:
             relatorio.get_relatorio_usuarios_livros()
         if opcao_relatorio == 3:

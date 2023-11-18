@@ -165,7 +165,7 @@ class Controller_Livro:
             print(f"O livro de código {id_livro} não existe na base.")
             return None
         
-        livros_disponiveis_df = Relatorio().get_dataframe_livros_disponiveis()
+        livros_disponiveis_df = Relatorio().get_dataframe_livros_detail_disponiveis()
 
         if not (int(id_livro) in livros_disponiveis_df.id_livro.values.tolist()):
             print(f"O livro de código {id_livro} não possui quantidade disponível.")
