@@ -92,7 +92,7 @@ class Controller_Emprestimo:
         # Retorna o objeto
         return registro_atualizado
 
-    def excluir_livro(self):
+    def excluir_emprestimo(self):
         # Cria uma nova conexão com o banco que permite alteração
         self.mongo.connect()
 
@@ -105,12 +105,17 @@ class Controller_Emprestimo:
             print(f"O código {id_emprestimo} não existe.")
             return
         
+        # Confirma se o usuário realmente deseja excluir o item selecionado
+        confirmar_exclusao = input("Deseja realmente continuar com a exclusão? (S/N): ")
+        if confirmar_exclusao.strip().lower() != "s":
+            return None
+
         # Recupera os dados transformando em um DataFrame
         emprestimo_excluido = Controller_Emprestimo.get_emprestimo_from_dataframe(self.mongo, id_emprestimo)
         # Revome da tabela
         self.mongo.db["emprestimos"].delete_one({"id_emprestimo": id_emprestimo})
         # Exibe os atributos do produto excluído
-        print("Livro removido com Sucesso!")
+        print("Empréstimo removido com sucesso!")
         print(emprestimo_excluido.to_string())
         self.mongo.close()
 
@@ -204,6 +209,44 @@ class Controller_Emprestimo:
             return None
         else:
             return Controller_Emprestimo.get_emprestimo_from_dataframe(mongo, codigo_emprestimo)
+
+    @staticmethod
+    def verifica_emprestimo_aberto(mongo:MongoQueries, id_emprestimo:int=None) -> bool:
+        query_result = mongo.db['emprestimos'].aggregate([
+            {
+                '$match': {
+                    'id_emprestimo': { '$eq': int(id_emprestimo) }
+                }
+            },
+            {
+                '$lookup': {
+                    'from': "devolucoes",
+                    'localField': "id_emprestimo",
+                    'foreignField': "id_emprestimo",
+                    'as': "devolucoes"
+                }
+            },
+            {
+                '$project': {
+                    '_id': 0,
+                    'id_emprestimo': 1,
+                    'devolucao_realizada': {
+                        '$cond': {
+                            'if': { '$gt': [{ '$size': "$devolucoes" }, 0] },
+                            'then': 1,
+                            'else': 0
+                        }
+                    }
+                    }
+            }
+        ])
+        dataframe = pd.DataFrame(list(query_result))
+
+        if dataframe.empty:
+            return False
+        
+        return int(dataframe.devolucao_realizada.values[0]) == 0
+
 
     @staticmethod
     def valida_data_format(data_string:str=None) -> bool:

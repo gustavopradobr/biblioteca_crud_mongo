@@ -106,6 +106,11 @@ class Controller_Livro:
             print(f"O código {id_livro} não existe.")
             return
         
+        # Confirma se o usuário realmente deseja excluir o item selecionado
+        confirmar_exclusao = input("Deseja realmente continuar com a exclusão? (S/N): ")
+        if confirmar_exclusao.strip().lower() != "s":
+            return None
+
         # Recupera os dados transformando em um DataFrame
         dataframe = Controller_Livro.recupera_livro_codigo(self.mongo, id_livro)
         # Revome da tabela

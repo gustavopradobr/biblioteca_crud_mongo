@@ -68,7 +68,7 @@ class Relatorio:
                                                 },
                                                 {
                                                     '$sort': {
-                                                        "devolucao_realizada": 1,
+                                                        "Status": 1,
                                                         "id_emprestimo": 1
                                                     }
                                                 }
@@ -77,14 +77,10 @@ class Relatorio:
         return query_result
 
     def get_relatorio_emprestimos(self) -> bool:
-        # Cria uma nova conexão com o banco
-        mongo = MongoQueries()
-        mongo.connect()
         # Recupera os dados transformando em um DataFrame
         query_result = self.get_query_emprestimos_detail()
         dataframe = pd.DataFrame(list(query_result))
-        # Fecha a conexão com o Mongo
-        mongo.close()
+
         # Exibe o resultado
         if dataframe.empty:
             print("A tabela Emprestimos não possui registros.")
@@ -321,3 +317,17 @@ class Relatorio:
             return False        
         print(dataframe)
         return True
+    
+    def get_relatorio_emprestimos_pendentes_por_usuario(self, codigo_usuario) -> bool:        
+        # Recupera os dados transformando em um DataFrame
+        query_result = self.get_query_emprestimos_detail()
+        dataframe = pd.DataFrame(list(query_result))
+        dataframe = dataframe[dataframe['id_usuario'] == int(codigo_usuario)]
+        dataframe = dataframe[dataframe['Status'] == "Pendente"]
+
+        if dataframe.empty:
+            print("\nNão existem devoluções pendentes para este usuário.")
+        else:        
+            print(dataframe)
+        #retorna se a consulta foi vazia, para saber se existem registros baseados neste usuario
+        return not dataframe.empty

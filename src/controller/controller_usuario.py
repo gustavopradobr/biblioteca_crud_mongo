@@ -94,6 +94,11 @@ class Controller_Usuario:
             print(f"O código {id_usuario} não existe.")
             return
         
+        # Confirma se o usuário realmente deseja excluir o item selecionado
+        confirmar_exclusao = input("Deseja realmente continuar com a exclusão? (S/N): ")
+        if confirmar_exclusao.strip().lower() != "s":
+            return None
+
         # Recupera os dados transformando em um DataFrame
         dataframe = Controller_Usuario.recupera_usuario_codigo(self.mongo, id_usuario)
         # Revome da tabela
