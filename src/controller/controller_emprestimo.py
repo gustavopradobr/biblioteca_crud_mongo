@@ -110,10 +110,21 @@ class Controller_Emprestimo:
         if confirmar_exclusao.strip().lower() != "s":
             return None
 
+        if Controller_Emprestimo.verifica_emprestimos_relacoes(self.mongo, id_emprestimo):
+            print(f"O empréstimo de código {id_emprestimo} possui registros dependentes. Deseja excluir mesmo assim? [S/N]")
+            opcao = input()
+
+            if opcao.upper() != "S":
+                print("Operação cancelada.")
+                return None
+            
+            print("Excluindo registros dependentes...")
+
         # Recupera os dados transformando em um DataFrame
         emprestimo_excluido = Controller_Emprestimo.get_emprestimo_from_dataframe(self.mongo, id_emprestimo)
-        # Revome da tabela
-        self.mongo.db["emprestimos"].delete_one({"id_emprestimo": id_emprestimo})
+
+        Controller_Emprestimo.excluir_emprestimo_relacoes(self.mongo, id_emprestimo)
+
         # Exibe os atributos do produto excluído
         print("Empréstimo removido com sucesso!")
         print(emprestimo_excluido.to_string())
@@ -132,7 +143,10 @@ class Controller_Emprestimo:
 
         print("\n\n")
 
-        self.relatorio.get_relatorio_livros_disponiveis()
+        if not self.relatorio.get_relatorio_livros_disponiveis():
+            #retorna se nao possuir livros disponiveis
+            return None
+        
         codigo_livro = str(input("\nDigite o código do livro a ser emprestado: "))
         livro = Controller_Livro.valida_livro_disponivel(self.mongo, codigo_livro)
         if livro == None:
@@ -154,7 +168,7 @@ class Controller_Emprestimo:
 
         return Emprestimo(0, livro, usuario, data_emprestimo, data_devolucao)
 
-
+    @staticmethod
     def verifica_existencia_livro(mongo:MongoQueries, codigo:int=None, external: bool = False) -> bool:
         if external:
             # Cria uma nova conexão com o banco que permite alteração
@@ -166,6 +180,19 @@ class Controller_Emprestimo:
             # Fecha a conexão com o Mongo
             mongo.close()
 
+        return not dataframe.empty
+    
+    @staticmethod
+    def excluir_emprestimo_relacoes(mongo:MongoQueries, id_emprestimo:int):
+        # Remove relação devolucoes
+        mongo.db["devolucoes"].delete_many({"id_emprestimo": int(id_emprestimo)})
+        # Remove da tabela emprestimos
+        mongo.db["emprestimos"].delete_one({"id_emprestimo": int(id_emprestimo)})
+
+    @staticmethod
+    def verifica_emprestimos_relacoes(mongo:MongoQueries, id_emprestimo:int) -> bool:
+        query_result = mongo.db["devolucoes"].find({ 'id_emprestimo': int(id_emprestimo) }, { '_id': 0, 'id_emprestimo': 1 })
+        dataframe = pd.DataFrame(list(query_result))
         return not dataframe.empty
 
     @staticmethod

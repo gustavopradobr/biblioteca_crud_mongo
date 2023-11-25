@@ -145,7 +145,10 @@ class Relatorio:
         if dataframe.empty:
             print("A tabela Livros não possui registros.")
             return False     
-        dataframe = dataframe[dataframe['Disponibilidade'] > 0]    
+        dataframe = dataframe[dataframe['Disponibilidade'] > 0]
+        if dataframe.empty:
+            print("Não existem livros disponíveis no momento.")
+            return False
         print(dataframe)
         return True
     

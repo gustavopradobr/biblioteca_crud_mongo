@@ -111,14 +111,27 @@ class Controller_Livro:
         if confirmar_exclusao.strip().lower() != "s":
             return None
 
+        if not Controller_Livro.get_livro_relacoes(self.mongo, id_livro).empty:
+            print(f"O livro de código {id_livro} possui registros dependentes. Deseja excluir mesmo assim? [S/N]")
+            opcao = input()
+
+            if opcao.upper() != "S":
+                print("Operação cancelada.")
+                return None
+            
+            print("Excluindo registros dependentes...")
+
         # Recupera os dados transformando em um DataFrame
         dataframe = Controller_Livro.recupera_livro_codigo(self.mongo, id_livro)
-        # Revome da tabela
+
+        Controller_Livro.excluir_livro_relacoes(self.mongo, id_livro)
+
+        # Remove da tabela
         self.mongo.db["livros"].delete_one({"id_livro": id_livro})
         # Cria um novo objeto para informar que foi removido
         livro_excluido = Livro(dataframe.id_livro.values[0], dataframe.titulo.values[0], dataframe.autor.values[0], dataframe.ano_publicacao.values[0], dataframe.quantidade.values[0])
         # Exibe os atributos do produto excluído
-        print("Livro removido com Sucesso!")
+        print("Livro removido com sucesso!")
         print(livro_excluido.to_string())
         self.mongo.close()
 
@@ -134,6 +147,27 @@ class Controller_Livro:
             mongo.close()
 
         return not dataframe.empty
+
+    @staticmethod
+    def excluir_livro_relacoes(mongo:MongoQueries, id_livro):
+        from controller.controller_emprestimo import Controller_Emprestimo
+        emprestimos_com_livro_df = Controller_Livro.get_livro_relacoes(mongo, id_livro)
+
+        if emprestimos_com_livro_df.empty:
+            return
+        
+        # Remove relações
+        for id_emprestimo in emprestimos_com_livro_df['id_emprestimo'].tolist():
+            Controller_Emprestimo.excluir_emprestimo_relacoes(mongo, id_emprestimo)
+
+        # Remove da tabela livros
+        mongo.db["livros"].delete_many({"id_livro": int(id_livro)})
+
+    @staticmethod
+    def get_livro_relacoes(mongo:MongoQueries, id_livro:int) -> pd.DataFrame:
+        query_result = mongo.db["emprestimos"].find({ 'id_livro': int(id_livro) }, { '_id': 0, 'id_emprestimo': 1, 'id_livro': 1 })
+        dataframe = pd.DataFrame(list(query_result))
+        return dataframe
 
     @staticmethod
     def recupera_registro(mongo:MongoQueries, _id:ObjectId=None) -> pd.DataFrame:

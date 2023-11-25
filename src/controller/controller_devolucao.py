@@ -128,7 +128,7 @@ class Controller_Devolucao:
         # Revome da tabela
         self.mongo.db["devolucoes"].delete_one({"id_devolucao": id_devolucao})
         # Exibe os atributos do produto excluído
-        print("Devolução removida com Sucesso!")
+        print("Devolução removida com sucesso!")
         print(devolucao_excluida.to_string())
         self.mongo.close()
 

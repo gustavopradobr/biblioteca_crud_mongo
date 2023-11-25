@@ -99,14 +99,25 @@ class Controller_Usuario:
         if confirmar_exclusao.strip().lower() != "s":
             return None
 
+        if not Controller_Usuario.get_usuario_relacoes(self.mongo, id_usuario).empty:
+            print(f"O usuário de código {id_usuario} possui registros dependentes. Deseja excluir mesmo assim? [S/N]")
+            opcao = input()
+
+            if opcao.upper() != "S":
+                print("Operação cancelada.")
+                return None
+            
+            print("Excluindo registros dependentes...")
+
         # Recupera os dados transformando em um DataFrame
         dataframe = Controller_Usuario.recupera_usuario_codigo(self.mongo, id_usuario)
-        # Revome da tabela
-        self.mongo.db["usuarios"].delete_one({"id_usuario": id_usuario})
+
+        Controller_Usuario.excluir_usuario_relacoes(self.mongo, id_usuario)
+
         # Cria um novo objeto para informar que foi removido
         usuario_excluido = Usuario(dataframe.id_usuario.values[0], dataframe.nome.values[0], dataframe.email.values[0], dataframe.telefone.values[0])
         # Exibe os atributos do produto excluído
-        print("Usuário removido com Sucesso!")
+        print("Usuário removido com sucesso!")
         print(usuario_excluido.to_string())
         self.mongo.close()
 
@@ -124,6 +135,27 @@ class Controller_Usuario:
 
         return not dataframe.empty
     
+    @staticmethod
+    def excluir_usuario_relacoes(mongo:MongoQueries, id_usuario):
+        from controller.controller_emprestimo import Controller_Emprestimo
+        emprestimos_com_usuario_df = Controller_Usuario.get_usuario_relacoes(mongo, id_usuario)
+
+        if emprestimos_com_usuario_df.empty:
+            return
+        
+        # Remove relações
+        for id_emprestimo in emprestimos_com_usuario_df['id_emprestimo'].tolist():
+            Controller_Emprestimo.excluir_emprestimo_relacoes(mongo, id_emprestimo)
+
+        # Remove da tabela usuarios
+        mongo.db["usuarios"].delete_many({"id_usuario": int(id_usuario)})
+
+    @staticmethod
+    def get_usuario_relacoes(mongo:MongoQueries, id_usuario:int) -> pd.DataFrame:
+        query_result = mongo.db["emprestimos"].find({ 'id_usuario': int(id_usuario) }, { '_id': 0, 'id_emprestimo': 1, 'id_usuario': 1 })
+        dataframe = pd.DataFrame(list(query_result))
+        return dataframe
+
     @staticmethod
     def recupera_registro(mongo:MongoQueries, _id:ObjectId=None) -> pd.DataFrame:
         # Recupera os dados do registro transformando em um DataFrame
