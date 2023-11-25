@@ -60,8 +60,21 @@ class Relatorio:
                                                         "id_usuario": 1,
                                                         "Nome Usuario": "$usuario.nome",
                                                         "Titulo Livro": "$livro.titulo",
-                                                        "Data Emprestimo": "$data_emprestimo",
-                                                        "Devolucao Sugerida": "$data_devolucao_sugerida",
+                                                        #"Data Emprestimo": "$data_emprestimo",
+                                                        #"Data Emprestimo": {'$toDate':"$data_emprestimo"},
+                                                        "Data Emprestimo":
+                                                        { '$dateToString': {
+                                                                'date': {'$toDate':"$data_emprestimo"},
+                                                                'format': "%d/%m/%Y"
+                                                            } },
+                                                        #"Devolucao Sugerida": "$data_devolucao_sugerida",
+                                                        #"Devolucao Sugerida": {'$toDate':"$data_devolucao_sugerida"},
+                                                        "Devolucao Sugerida":
+                                                        { '$dateToString': {
+                                                                'date': {'$toDate':"$data_devolucao_sugerida"},
+                                                                'format': "%d/%m/%Y"
+                                                            } },
+
                                                         "Status": "$devolucao_realizada",
                                                         '_id': 0
                                                     }
@@ -96,7 +109,12 @@ class Relatorio:
         query_result = mongo.db["devolucoes"].find({}, 
                                                  {"id_devolucao": 1, 
                                                   "id_emprestimo": 1, 
-                                                  "Data Devolucao": "$data_devolucao", 
+                                                  #"Data Devolucao": "$data_devolucao",
+                                                  "Data Devolucao":
+                                                        { '$dateToString': {
+                                                                'date': {'$toDate':"$data_devolucao"},
+                                                                'format': "%d/%m/%Y"
+                                                        } },
                                                   "_id": 0
                                                  }).sort("id_devolucao", ASCENDING)
         dataframe = pd.DataFrame(list(query_result))

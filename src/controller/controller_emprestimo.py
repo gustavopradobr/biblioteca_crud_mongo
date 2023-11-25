@@ -50,8 +50,11 @@ class Controller_Emprestimo:
 
         proximo = int(list(proximo)[0]['proximo_emprestimo'])
         
+        data_emprestimo_format = datetime.datetime.strptime(data_emprestimo, '%d/%m/%Y')
+        data_devolucao_format = datetime.datetime.strptime(data_devolucao_sugerida, '%d/%m/%Y')
+
         # Insere e Recupera o código do novo registro
-        id_registro = self.mongo.db["emprestimos"].insert_one({"id_emprestimo": proximo, "id_livro": id_livro, "id_usuario": id_usuario, "data_emprestimo": data_emprestimo, "data_devolucao_sugerida": data_devolucao_sugerida})
+        id_registro = self.mongo.db["emprestimos"].insert_one({"id_emprestimo": proximo, "id_livro": id_livro, "id_usuario": id_usuario, "data_emprestimo": data_emprestimo_format, "data_devolucao_sugerida": data_devolucao_format})
         # Recupera os dados do novo registro criado transformando em um DataFrame
         novo_registro = Controller_Emprestimo.get_emprestimo_from_dataframe(self.mongo, proximo)
         print(novo_registro.to_string())
@@ -81,8 +84,11 @@ class Controller_Emprestimo:
         data_emprestimo = emprestimo_atualizado.get_data_emprestimo()
         data_devolucao_sugerida = emprestimo_atualizado.get_data_devolucao()
 
+        data_emprestimo_format = datetime.datetime.strptime(data_emprestimo, '%d/%m/%Y')
+        data_devolucao_format = datetime.datetime.strptime(data_devolucao_sugerida, '%d/%m/%Y')
+
         # Atualiza a descrição do produto existente
-        self.mongo.db["emprestimos"].update_one({"id_emprestimo": id_emprestimo}, {"$set": {"id_livro": id_livro, "id_usuario": id_usuario, "data_emprestimo": data_emprestimo, "data_devolucao_sugerida": data_devolucao_sugerida}})
+        self.mongo.db["emprestimos"].update_one({"id_emprestimo": id_emprestimo}, {"$set": {"id_livro": id_livro, "id_usuario": id_usuario, "data_emprestimo": data_emprestimo_format, "data_devolucao_sugerida": data_devolucao_format}})
 
         # Cria um novo objeto
         registro_atualizado = Controller_Emprestimo.get_emprestimo_from_dataframe(self.mongo, id_emprestimo)

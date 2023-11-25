@@ -47,8 +47,10 @@ class Controller_Devolucao:
 
         proximo = int(list(proximo)[0]['proximo_devolucao'])
         
+        data_devolucao_format = datetime.datetime.strptime(data_devolucao, '%d/%m/%Y')
+
         # Insere e Recupera o código do novo registro
-        id_registro = self.mongo.db["devolucoes"].insert_one({"id_devolucao": proximo, "id_emprestimo": id_emprestimo, "data_devolucao": data_devolucao})
+        id_registro = self.mongo.db["devolucoes"].insert_one({"id_devolucao": proximo, "id_emprestimo": id_emprestimo, "data_devolucao": data_devolucao_format})
         # Recupera os dados do novo registro criado transformando em um DataFrame
         novo_registro = Controller_Devolucao.get_devolucao_from_dataframe(self.mongo, proximo)
         print(novo_registro.to_string())
@@ -93,8 +95,10 @@ class Controller_Devolucao:
         id_emprestimo = int(devolucao_cadastrada.get_emprestimo().get_id_emprestimo())
         data_devolucao = devolucao_cadastrada.get_data_devolucao()
 
+        data_devolucao_format = datetime.datetime.strptime(data_devolucao, '%d/%m/%Y')
+
         # Atualiza a descrição do produto existente
-        self.mongo.db["devolucoes"].update_one({"id_devolucao": id_devolucao}, {"$set": {"id_emprestimo": id_emprestimo, "data_devolucao": data_devolucao}})
+        self.mongo.db["devolucoes"].update_one({"id_devolucao": id_devolucao}, {"$set": {"id_emprestimo": id_emprestimo, "data_devolucao": data_devolucao_format}})
 
         # Cria um novo objeto
         registro_atualizado = Controller_Devolucao.get_devolucao_from_dataframe(self.mongo, id_devolucao)
