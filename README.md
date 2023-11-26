@@ -1,6 +1,6 @@
 # Biblioteca CRUD MongoDB 📚
 
-Este projeto representa um sistema de gerenciamento de biblioteca escolar, contendo coleções como: usuarios, livros, emprestimos e devolucoes.
+Este projeto representa um sistema de gerenciamento de biblioteca escolar utilizando banco de dados MongoDB.
 
 O sistema exige que as coleções existam, então basta executar o script Python a seguir para criação das coleções e preenchimento de dados de exemplos:
 ```shell
@@ -13,7 +13,10 @@ Para executar o sistema basta executar o script Python a seguir:
 ~$ python principal.py
 ```
 
-## Organização
+### Bibliotecas Utilizadas
+- [requirements.txt](src/requirements.txt): `pip install -r requirements.txt`
+
+## Organização do projeto 📁
 - [diagrams](diagrams): Nesse diretório está o [diagrama relacional](diagrams/BIBLIOTECA_DIAGRAMA_RELACIONAL.pdf) (lógico) do sistema.
     * O sistema possui quatro entidades: USUARIOS, LIVROS, EMPRESTIMOS e DEVOLUCOES
 - [src](src): Nesse diretório estão os scripts do sistema
@@ -95,5 +98,5 @@ Para executar o sistema basta executar o script Python a seguir:
     * [createCollectionsAndData.py](src/createCollectionsAndData.py): Script responsável por criar as tabelas e registros fictícios. Esse script deve ser executado antes do script [principal.py](src/principal.py) para gerar as tabelas, caso não execute os scripts diretamente no SQL Developer ou em alguma outra IDE de acesso ao Banco de Dados.
     * [principal.py](src/principal.py): Script responsável por ser a interface entre o usuário e os módulos de acesso ao Banco de Dados. Deve ser executado após a criação das tabelas.
 
-### Bibliotecas Utilizadas
-- [requirements.txt](src/requirements.txt): `pip install -r requirements.txt`
+## Vídeo demonstrativo 🎬
+[`Acesse aqui`](https://www.youtube.com/watch?v=zMx_S5pCMr0) o vídeo demonstrativo da aplicação.
